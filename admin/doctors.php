@@ -20,15 +20,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $available_time = sanitize($_POST['available_time']);
     $bio = sanitize($_POST['bio']);
     $status = sanitize($_POST['status']);
+    $image = 'default-doctor.png';
+
+    // Handle Image Upload
+    if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+        $upload_dir = '../uploads/doctors/';
+        $file_ext = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
+        $file_name = 'doctor_' . time() . '_' . rand(1000, 9999) . '.' . $file_ext;
+        $target_file = $upload_dir . $file_name;
+        
+        if (move_uploaded_file($_FILES['image']['tmp_name'], $target_file)) {
+            $image = $file_name;
+        }
+    }
 
     if ($_POST['action'] === 'add') {
-        $stmt = $conn->prepare("INSERT INTO doctors (name, specialization, experience, qualification, hospital, location, fee, phone, email, available_days, available_time, bio, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("ssisssdssssss", $name, $specialization, $experience, $qualification, $hospital, $location, $fee, $phone, $email, $available_days, $available_time, $bio, $status);
+        $stmt = $conn->prepare("INSERT INTO doctors (name, specialization, experience, qualification, hospital, location, fee, phone, email, available_days, available_time, bio, status, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("ssisssdsssssss", $name, $specialization, $experience, $qualification, $hospital, $location, $fee, $phone, $email, $available_days, $available_time, $bio, $status, $image);
         $stmt->execute();
     } elseif ($_POST['action'] === 'edit') {
         $id = (int)$_POST['id'];
-        $stmt = $conn->prepare("UPDATE doctors SET name=?, specialization=?, experience=?, qualification=?, hospital=?, location=?, fee=?, phone=?, email=?, available_days=?, available_time=?, bio=?, status=? WHERE id=?");
-        $stmt->bind_param("ssisssdssssssi", $name, $specialization, $experience, $qualification, $hospital, $location, $fee, $phone, $email, $available_days, $available_time, $bio, $status, $id);
+        // If no new image uploaded, keep the existing one
+        if ($_FILES['image']['error'] === UPLOAD_ERR_NO_FILE) {
+            $stmt_get = $conn->prepare("SELECT image FROM doctors WHERE id=?");
+            $stmt_get->bind_param("i", $id);
+            $stmt_get->execute();
+            $result = $stmt_get->get_result()->fetch_assoc();
+            $image = $result['image'];
+        }
+        $stmt = $conn->prepare("UPDATE doctors SET name=?, specialization=?, experience=?, qualification=?, hospital=?, location=?, fee=?, phone=?, email=?, available_days=?, available_time=?, bio=?, status=?, image=? WHERE id=?");
+        $stmt->bind_param("ssisssdsssssssi", $name, $specialization, $experience, $qualification, $hospital, $location, $fee, $phone, $email, $available_days, $available_time, $bio, $status, $image, $id);
         $stmt->execute();
     }
 }
@@ -81,8 +102,19 @@ $doctors = $conn->query("SELECT * FROM doctors ORDER BY created_at DESC");
                     <?php while ($doctor = $doctors->fetch_assoc()): ?>
                         <tr>
                             <td>
-                                <strong><?php echo htmlspecialchars($doctor['name']); ?></strong><br>
-                                <small><?php echo htmlspecialchars($doctor['email']); ?></small>
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="width: 50px; height: 50px; border-radius: 50%; overflow: hidden; background: #f0f0f0;">
+                                        <?php if ($doctor['image'] && $doctor['image'] !== 'default-doctor.png'): ?>
+                                            <img src="../uploads/doctors/<?php echo $doctor['image']; ?>" style="width: 100%; height: 100%; object-fit: cover;">
+                                        <?php else: ?>
+                                            <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;"><i class="fas fa-user-md"></i></div>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div>
+                                        <strong><?php echo htmlspecialchars($doctor['name']); ?></strong><br>
+                                        <small><?php echo htmlspecialchars($doctor['email']); ?></small>
+                                    </div>
+                                </div>
                             </td>
                             <td><?php echo htmlspecialchars($doctor['specialization']); ?></td>
                             <td><?php echo htmlspecialchars($doctor['hospital']); ?></td>
@@ -117,9 +149,18 @@ $doctors = $conn->query("SELECT * FROM doctors ORDER BY created_at DESC");
             <h3 id="modalTitle">Add New Doctor</h3>
             <button class="modal-close" onclick="closeModal('doctorModal')"><i class="fas fa-times"></i></button>
         </div>
-        <form method="POST" class="modal-body">
+        <form method="POST" class="modal-body" enctype="multipart/form-data">
             <input type="hidden" name="action" id="doctorAction" value="add">
             <input type="hidden" name="id" id="doctorId">
+            
+            <div class="form-group">
+                <label class="form-label">Doctor Image</label>
+                <div style="width: 100px; height: 100px; border-radius: 50%; overflow: hidden; background: #f0f0f0; margin-bottom: 1rem; display: flex; align-items: center; justify-content: center;">
+                    <img id="doctorImagePreview" src="" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                    <i id="doctorImagePlaceholder" class="fas fa-user-md" style="font-size: 2rem; color: #ccc;"></i>
+                </div>
+                <input type="file" name="image" id="doctorImage" class="form-input" accept="image/*" onchange="previewDoctorImage(event)">
+            </div>
             
             <div class="grid-2">
                 <div class="form-group">
@@ -186,6 +227,25 @@ $doctors = $conn->query("SELECT * FROM doctors ORDER BY created_at DESC");
 </div>
 
 <script>
+function previewDoctorImage(event) {
+    const file = event.target.files[0];
+    const preview = document.getElementById('doctorImagePreview');
+    const placeholder = document.getElementById('doctorImagePlaceholder');
+    
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+            placeholder.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    } else {
+        preview.style.display = 'none';
+        placeholder.style.display = 'block';
+    }
+}
+
 function setDoctorAction(action) {
     document.getElementById('doctorAction').value = action;
     document.getElementById('modalTitle').textContent = action === 'add' ? 'Add New Doctor' : 'Edit Doctor';
@@ -193,6 +253,8 @@ function setDoctorAction(action) {
         document.getElementById('doctorId').value = '';
         document.querySelectorAll('#doctorModal .form-input').forEach(input => input.value = '');
         document.getElementById('doctorStatus').value = 'active';
+        document.getElementById('doctorImagePreview').style.display = 'none';
+        document.getElementById('doctorImagePlaceholder').style.display = 'block';
     }
 }
 
@@ -212,6 +274,17 @@ function editDoctor(doctor) {
     document.getElementById('doctorTime').value = doctor.available_time;
     document.getElementById('doctorBio').value = doctor.bio;
     document.getElementById('doctorStatus').value = doctor.status;
+    
+    // Show doctor image if exists
+    if (doctor.image && doctor.image !== 'default-doctor.png') {
+        document.getElementById('doctorImagePreview').src = '../uploads/doctors/' + doctor.image;
+        document.getElementById('doctorImagePreview').style.display = 'block';
+        document.getElementById('doctorImagePlaceholder').style.display = 'none';
+    } else {
+        document.getElementById('doctorImagePreview').style.display = 'none';
+        document.getElementById('doctorImagePlaceholder').style.display = 'block';
+    }
+    
     openModal('doctorModal');
 }
 </script>

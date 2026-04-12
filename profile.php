@@ -7,9 +7,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $full_name = sanitize($_POST['full_name']);
     $phone = sanitize($_POST['phone']);
     $address = sanitize($_POST['address']);
+    $user_id = $_SESSION['user_id'];
     
-    $stmt = $conn->prepare("UPDATE users SET full_name = ?, phone = ?, address = ? WHERE id = ?");
-    $stmt->bind_param("sssi", $full_name, $phone, $address, $_SESSION['user_id']);
+    // Handle Avatar Upload
+    $avatar_sql = "";
+    if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
+        $upload_dir = 'uploads/profiles/';
+        $file_ext = pathinfo($_FILES['avatar']['name'], PATHINFO_EXTENSION);
+        $file_name = 'user_' . $user_id . '_' . time() . '.' . $file_ext;
+        $target_file = $upload_dir . $file_name;
+        
+        if (move_uploaded_file($_FILES['avatar']['tmp_name'], $target_file)) {
+            $avatar_sql = ", avatar = '$file_name'";
+            $_SESSION['avatar'] = $file_name;
+        }
+    }
+    
+    $query = "UPDATE users SET full_name = ?, phone = ?, address = ? $avatar_sql WHERE id = ?";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("sssi", $full_name, $phone, $address, $user_id);
     
     if ($stmt->execute()) {
         $_SESSION['full_name'] = $full_name;
@@ -43,7 +59,19 @@ $user = $stmt->get_result()->fetch_assoc();
         
         <?php echo $message; ?>
         
-        <form method="POST" class="card-body">
+        <form method="POST" class="card-body" enctype="multipart/form-data">
+            <div class="form-group" style="text-align: center; margin-bottom: 2rem;">
+                <div class="user-avatar" style="width: 100px; height: 100px; margin: 0 auto 1rem; font-size: 2.5rem;">
+                    <?php if ($user['avatar'] && $user['avatar'] !== 'default-avatar.png'): ?>
+                        <img src="uploads/profiles/<?php echo $user['avatar']; ?>" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+                    <?php else: ?>
+                        <?php echo strtoupper(substr($user['full_name'], 0, 1)); ?>
+                    <?php endif; ?>
+                </div>
+                <label class="form-label">Profile Picture</label>
+                <input type="file" name="avatar" class="form-input" accept="image/*">
+            </div>
+
             <div class="form-group">
                 <label class="form-label">Full Name</label>
                 <input type="text" name="full_name" class="form-input" value="<?php echo htmlspecialchars($user['full_name']); ?>" required>

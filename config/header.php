@@ -117,15 +117,27 @@ $current_page = basename($_SERVER['PHP_SELF'], '.php');
             </nav>
             
             <div class="sidebar-footer">
-                <div class="user-profile">
-                    <div class="user-avatar">
-                        <?php echo strtoupper(substr($_SESSION['full_name'], 0, 1)); ?>
-                    </div>
-                    <div class="user-info">
-                        <h4><?php echo htmlspecialchars($_SESSION['full_name']); ?></h4>
-                        <p><?php echo ucfirst($_SESSION['role']); ?></p>
-                    </div>
-                </div>
+	                <div class="user-profile">
+	                    <div class="user-avatar">
+	                        <?php 
+	                        $user_id = $_SESSION['user_id'];
+	                        $stmt = $conn->prepare("SELECT avatar FROM users WHERE id = ?");
+	                        $stmt->bind_param("i", $user_id);
+	                        $stmt->execute();
+	                        $avatar_res = $stmt->get_result()->fetch_assoc();
+	                        $avatar = $avatar_res['avatar'] ?? 'default-avatar.png';
+	                        
+	                        if ($avatar && $avatar !== 'default-avatar.png'): ?>
+	                            <img src="/medxpert/uploads/profiles/<?php echo $avatar; ?>" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+	                        <?php else: ?>
+	                            <?php echo strtoupper(substr($_SESSION['full_name'], 0, 1)); ?>
+	                        <?php endif; ?>
+	                    </div>
+	                    <div class="user-info">
+	                        <h4><?php echo htmlspecialchars($_SESSION['full_name']); ?></h4>
+	                        <p><?php echo ucfirst($_SESSION['role']); ?></p>
+	                    </div>
+	                </div>
             </div>
         </aside>
         

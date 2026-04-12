@@ -15,15 +15,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $location = sanitize($_POST['location']);
     $available = isset($_POST['available']) ? 1 : 0;
     $medical_conditions = sanitize($_POST['medical_conditions']);
+    $image = 'default-donor.png';
+
+    // Handle Image Upload
+    if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+        $upload_dir = '../uploads/donors/';
+        $file_ext = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
+        $file_name = 'donor_' . time() . '_' . rand(1000, 9999) . '.' . $file_ext;
+        $target_file = $upload_dir . $file_name;
+        
+        if (move_uploaded_file($_FILES['image']['tmp_name'], $target_file)) {
+            $image = $file_name;
+        }
+    }
 
     if ($_POST['action'] === 'add') {
-        $stmt = $conn->prepare("INSERT INTO blood_donors (name, blood_type, age, phone, email, location, available, medical_conditions) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("ssisssis", $name, $blood_type, $age, $phone, $email, $location, $available, $medical_conditions);
+        $stmt = $conn->prepare("INSERT INTO blood_donors (name, blood_type, age, phone, email, location, available, medical_conditions, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("ssisssiss", $name, $blood_type, $age, $phone, $email, $location, $available, $medical_conditions, $image);
         $stmt->execute();
     } elseif ($_POST['action'] === 'edit') {
         $id = (int)$_POST['id'];
-        $stmt = $conn->prepare("UPDATE blood_donors SET name=?, blood_type=?, age=?, phone=?, email=?, location=?, available=?, medical_conditions=? WHERE id=?");
-        $stmt->bind_param("ssisssisi", $name, $blood_type, $age, $phone, $email, $location, $available, $medical_conditions, $id);
+        // If no new image uploaded, keep the existing one
+        if ($_FILES['image']['error'] === UPLOAD_ERR_NO_FILE) {
+            $stmt_get = $conn->prepare("SELECT image FROM blood_donors WHERE id=?");
+            $stmt_get->bind_param("i", $id);
+            $stmt_get->execute();
+            $result = $stmt_get->get_result()->fetch_assoc();
+            $image = $result['image'];
+        }
+        $stmt = $conn->prepare("UPDATE blood_donors SET name=?, blood_type=?, age=?, phone=?, email=?, location=?, available=?, medical_conditions=?, image=? WHERE id=?");
+        $stmt->bind_param("ssisssissi", $name, $blood_type, $age, $phone, $email, $location, $available, $medical_conditions, $image, $id);
         $stmt->execute();
     }
 }
@@ -76,8 +97,19 @@ $donors = $conn->query("SELECT * FROM blood_donors ORDER BY created_at DESC");
                     <?php while ($donor = $donors->fetch_assoc()): ?>
                         <tr>
                             <td>
-                                <strong><?php echo htmlspecialchars($donor['name']); ?></strong><br>
-                                <small><?php echo htmlspecialchars($donor['email']); ?></small>
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="width: 50px; height: 50px; border-radius: 50%; overflow: hidden; background: #f0f0f0;">
+                                        <?php if ($donor['image'] && $donor['image'] !== 'default-donor.png'): ?>
+                                            <img src="../uploads/donors/<?php echo $donor['image']; ?>" style="width: 100%; height: 100%; object-fit: cover;">
+                                        <?php else: ?>
+                                            <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;"><i class="fas fa-user"></i></div>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div>
+                                        <strong><?php echo htmlspecialchars($donor['name']); ?></strong><br>
+                                        <small><?php echo htmlspecialchars($donor['email']); ?></small>
+                                    </div>
+                                </div>
                             </td>
                             <td><span class="badge badge-danger"><?php echo htmlspecialchars($donor['blood_type']); ?></span></td>
                             <td><?php echo htmlspecialchars($donor['age']); ?></td>
@@ -112,9 +144,18 @@ $donors = $conn->query("SELECT * FROM blood_donors ORDER BY created_at DESC");
             <h3 id="modalTitle">Add New Donor</h3>
             <button class="modal-close" onclick="closeModal('donorModal')"><i class="fas fa-times"></i></button>
         </div>
-        <form method="POST" class="modal-body">
+        <form method="POST" class="modal-body" enctype="multipart/form-data">
             <input type="hidden" name="action" id="donorAction" value="add">
             <input type="hidden" name="id" id="donorId">
+            
+            <div class="form-group">
+                <label class="form-label">Donor Image</label>
+                <div style="width: 100px; height: 100px; border-radius: 50%; overflow: hidden; background: #f0f0f0; margin-bottom: 1rem; display: flex; align-items: center; justify-content: center;">
+                    <img id="donorImagePreview" src="" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                    <i id="donorImagePlaceholder" class="fas fa-user" style="font-size: 2rem; color: #ccc;"></i>
+                </div>
+                <input type="file" name="image" id="donorImage" class="form-input" accept="image/*" onchange="previewDonorImage(event)">
+            </div>
             
             <div class="form-group">
                 <label class="form-label">Full Name</label>
@@ -173,6 +214,25 @@ $donors = $conn->query("SELECT * FROM blood_donors ORDER BY created_at DESC");
 </div>
 
 <script>
+function previewDonorImage(event) {
+    const file = event.target.files[0];
+    const preview = document.getElementById('donorImagePreview');
+    const placeholder = document.getElementById('donorImagePlaceholder');
+    
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+            placeholder.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    } else {
+        preview.style.display = 'none';
+        placeholder.style.display = 'block';
+    }
+}
+
 function setDonorAction(action) {
     document.getElementById('donorAction').value = action;
     document.getElementById('modalTitle').textContent = action === 'add' ? 'Add New Donor' : 'Edit Donor';
@@ -180,6 +240,8 @@ function setDonorAction(action) {
         document.getElementById('donorId').value = '';
         document.querySelectorAll('#donorModal .form-input').forEach(input => input.value = '');
         document.getElementById('donorAvailable').checked = true;
+        document.getElementById('donorImagePreview').style.display = 'none';
+        document.getElementById('donorImagePlaceholder').style.display = 'block';
     }
 }
 
@@ -194,6 +256,17 @@ function editDonor(donor) {
     document.getElementById('donorLocation').value = donor.location;
     document.getElementById('donorMedical').value = donor.medical_conditions;
     document.getElementById('donorAvailable').checked = donor.available == 1;
+    
+    // Show donor image if exists
+    if (donor.image && donor.image !== 'default-donor.png') {
+        document.getElementById('donorImagePreview').src = '../uploads/donors/' + donor.image;
+        document.getElementById('donorImagePreview').style.display = 'block';
+        document.getElementById('donorImagePlaceholder').style.display = 'none';
+    } else {
+        document.getElementById('donorImagePreview').style.display = 'none';
+        document.getElementById('donorImagePlaceholder').style.display = 'block';
+    }
+    
     openModal('donorModal');
 }
 </script>

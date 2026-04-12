@@ -117,7 +117,7 @@ function initSearch() {
 }
 
 function searchDoctors(term) {
-    fetch(`../api/get_doctors.php?search=${term}`)
+    fetch(`api/get_doctors.php?search=${term}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -129,7 +129,7 @@ function searchDoctors(term) {
 
 function searchDonors(term) {
     const bloodType = document.querySelector('.filter-btn.active')?.dataset.filter || 'all';
-    fetch(`../api/get_donors.php?search=${term}&blood_type=${bloodType}`)
+    fetch(`api/get_donors.php?search=${term}&blood_type=${bloodType}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -141,7 +141,7 @@ function searchDonors(term) {
 
 function searchMedicines(term) {
     const category = document.querySelector('.filter-btn.active')?.dataset.filter || 'all';
-    fetch(`../api/get_medicines.php?search=${term}&category=${category}`)
+    fetch(`api/get_medicines.php?search=${term}&category=${category}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -180,7 +180,7 @@ function initFilters() {
 
 function filterDonors(bloodType) {
     const searchTerm = document.querySelector('[data-search="donors"]')?.value || '';
-    fetch(`../api/get_donors.php?blood_type=${bloodType}&search=${searchTerm}`)
+    fetch(`api/get_donors.php?blood_type=${bloodType}&search=${searchTerm}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -192,7 +192,7 @@ function filterDonors(bloodType) {
 
 function filterMedicines(category) {
     const searchTerm = document.querySelector('[data-search="medicines"]')?.value || '';
-    fetch(`../api/get_medicines.php?category=${category}&search=${searchTerm}`)
+    fetch(`api/get_medicines.php?category=${category}&search=${searchTerm}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -212,10 +212,16 @@ function renderDoctors(doctors) {
         return;
     }
     
-    container.innerHTML = doctors.map(doctor => `
+    container.innerHTML = doctors.map(doctor => {
+        const imageUrl = (doctor.image && doctor.image !== 'default-doctor.png') 
+            ? `/medxpert/uploads/doctors/${doctor.image}` 
+            : null;
+        return `
         <div class="item-card">
             <div class="item-header">
-                <div class="item-avatar">${doctor.name.charAt(0)}</div>
+                <div class="item-avatar" style="width: 60px; height: 60px; border-radius: 50%; overflow: hidden; background: #f0f0f0; display: flex; align-items: center; justify-content: center;">
+                    ${imageUrl ? `<img src="${imageUrl}" style="width: 100%; height: 100%; object-fit: cover;">` : `<span style="font-size: 1.5rem;">${doctor.name.charAt(0)}</span>`}
+                </div>
                 <div class="item-info">
                     <h3>${doctor.name}</h3>
                     <p style="color: var(--primary-light); margin: 0;">${doctor.specialization}</p>
@@ -249,7 +255,8 @@ function renderDoctors(doctors) {
                 </button>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 function renderDonors(donors) {
@@ -261,10 +268,16 @@ function renderDonors(donors) {
         return;
     }
     
-    container.innerHTML = donors.map(donor => `
+    container.innerHTML = donors.map(donor => {
+        const imageUrl = (donor.image && donor.image !== 'default-donor.png') 
+            ? `/medxpert/uploads/donors/${donor.image}` 
+            : null;
+        return `
         <div class="item-card">
             <div class="item-header">
-                <div class="item-avatar">${donor.name.charAt(0)}</div>
+                <div class="item-avatar" style="width: 60px; height: 60px; border-radius: 50%; overflow: hidden; background: #f0f0f0; display: flex; align-items: center; justify-content: center;">
+                    ${imageUrl ? `<img src="${imageUrl}" style="width: 100%; height: 100%; object-fit: cover;">` : `<span style="font-size: 1.5rem;">${donor.name.charAt(0)}</span>`}
+                </div>
                 <div class="item-info">
                     <h3>${donor.name}</h3>
                     <span class="badge badge-danger" style="display: inline-block; margin-top: 0.25rem;">
@@ -298,7 +311,8 @@ function renderDonors(donors) {
                 </button>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 function renderMedicines(medicines) {
@@ -310,8 +324,13 @@ function renderMedicines(medicines) {
         return;
     }
     
-    container.innerHTML = medicines.map(med => `
+    container.innerHTML = medicines.map(med => {
+        const imageUrl = (med.image && med.image !== 'default-medicine.png') 
+            ? `/medxpert/uploads/medicines/${med.image}` 
+            : null;
+        return `
         <div class="item-card">
+            ${imageUrl ? `<div style="width: 100%; height: 150px; border-radius: 4px; overflow: hidden; margin-bottom: 1rem; background: #f0f0f0;"><img src="${imageUrl}" style="width: 100%; height: 100%; object-fit: cover;"></div>` : ''}
             <div class="item-info">
                 <h3>${med.name}</h3>
                 <p style="color: var(--primary-light); margin: 0.25rem 0;">${med.category}</p>
@@ -341,7 +360,8 @@ function renderMedicines(medicines) {
                 </button>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 // Action Functions
@@ -450,7 +470,7 @@ function submitAmbulanceRequest() {
     // Set request_type to 'scheduled' for form submissions
     formData.set('request_type', 'scheduled');
     
-    fetch('../api/request_ambulance.php', {
+    fetch('api/request_ambulance.php', {
         method: 'POST',
         body: formData
     })

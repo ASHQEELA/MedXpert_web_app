@@ -16,15 +16,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $dosage = sanitize($_POST['dosage']);
     $prescription_required = isset($_POST['prescription_required']) ? 1 : 0;
     $status = sanitize($_POST['status']);
+    $image = 'default-medicine.png';
+
+    // Handle Image Upload
+    if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+        $upload_dir = '../uploads/medicines/';
+        $file_ext = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
+        $file_name = 'medicine_' . time() . '_' . rand(1000, 9999) . '.' . $file_ext;
+        $target_file = $upload_dir . $file_name;
+        
+        if (move_uploaded_file($_FILES['image']['tmp_name'], $target_file)) {
+            $image = $file_name;
+        }
+    }
 
     if ($_POST['action'] === 'add') {
-        $stmt = $conn->prepare("INSERT INTO medicines (name, category, price, stock, description, manufacturer, dosage, prescription_required, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("ssdssssis", $name, $category, $price, $stock, $description, $manufacturer, $dosage, $prescription_required, $status);
+        $stmt = $conn->prepare("INSERT INTO medicines (name, category, price, stock, description, manufacturer, dosage, prescription_required, status, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("ssdssssiss", $name, $category, $price, $stock, $description, $manufacturer, $dosage, $prescription_required, $status, $image);
         $stmt->execute();
     } elseif ($_POST['action'] === 'edit') {
         $id = (int)$_POST['id'];
-        $stmt = $conn->prepare("UPDATE medicines SET name=?, category=?, price=?, stock=?, description=?, manufacturer=?, dosage=?, prescription_required=?, status=? WHERE id=?");
-        $stmt->bind_param("ssdssssisi", $name, $category, $price, $stock, $description, $manufacturer, $dosage, $prescription_required, $status, $id);
+        // If no new image uploaded, keep the existing one
+        if ($_FILES['image']['error'] === UPLOAD_ERR_NO_FILE) {
+            $stmt_get = $conn->prepare("SELECT image FROM medicines WHERE id=?");
+            $stmt_get->bind_param("i", $id);
+            $stmt_get->execute();
+            $result = $stmt_get->get_result()->fetch_assoc();
+            $image = $result['image'];
+        }
+        $stmt = $conn->prepare("UPDATE medicines SET name=?, category=?, price=?, stock=?, description=?, manufacturer=?, dosage=?, prescription_required=?, status=?, image=? WHERE id=?");
+        $stmt->bind_param("ssdssssissi", $name, $category, $price, $stock, $description, $manufacturer, $dosage, $prescription_required, $status, $image, $id);
         $stmt->execute();
     }
 }
@@ -77,8 +98,19 @@ $medicines = $conn->query("SELECT * FROM medicines ORDER BY created_at DESC");
                     <?php while ($med = $medicines->fetch_assoc()): ?>
                         <tr>
                             <td>
-                                <strong><?php echo htmlspecialchars($med['name']); ?></strong><br>
-                                <small><?php echo htmlspecialchars($med['manufacturer']); ?></small>
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="width: 50px; height: 50px; border-radius: 4px; overflow: hidden; background: #f0f0f0;">
+                                        <?php if ($med['image'] && $med['image'] !== 'default-medicine.png'): ?>
+                                            <img src="../uploads/medicines/<?php echo $med['image']; ?>" style="width: 100%; height: 100%; object-fit: cover;">
+                                        <?php else: ?>
+                                            <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;"><i class="fas fa-pills"></i></div>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div>
+                                        <strong><?php echo htmlspecialchars($med['name']); ?></strong><br>
+                                        <small><?php echo htmlspecialchars($med['manufacturer']); ?></small>
+                                    </div>
+                                </div>
                             </td>
                             <td><?php echo htmlspecialchars($med['category']); ?></td>
                             <td>৳<?php echo number_format($med['price'], 2); ?></td>
@@ -113,9 +145,18 @@ $medicines = $conn->query("SELECT * FROM medicines ORDER BY created_at DESC");
             <h3 id="modalTitle">Add New Medicine</h3>
             <button class="modal-close" onclick="closeModal('medicineModal')"><i class="fas fa-times"></i></button>
         </div>
-        <form method="POST" class="modal-body">
+        <form method="POST" class="modal-body" enctype="multipart/form-data">
             <input type="hidden" name="action" id="medicineAction" value="add">
             <input type="hidden" name="id" id="medicineId">
+            
+            <div class="form-group">
+                <label class="form-label">Medicine Image</label>
+                <div style="width: 100px; height: 100px; border-radius: 4px; overflow: hidden; background: #f0f0f0; margin-bottom: 1rem; display: flex; align-items: center; justify-content: center;">
+                    <img id="medicineImagePreview" src="" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                    <i id="medicineImagePlaceholder" class="fas fa-pills" style="font-size: 2rem; color: #ccc;"></i>
+                </div>
+                <input type="file" name="image" id="medicineImage" class="form-input" accept="image/*" onchange="previewMedicineImage(event)">
+            </div>
             
             <div class="grid-2">
                 <div class="form-group">
@@ -175,6 +216,25 @@ $medicines = $conn->query("SELECT * FROM medicines ORDER BY created_at DESC");
 </div>
 
 <script>
+function previewMedicineImage(event) {
+    const file = event.target.files[0];
+    const preview = document.getElementById('medicineImagePreview');
+    const placeholder = document.getElementById('medicineImagePlaceholder');
+    
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+            placeholder.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+    } else {
+        preview.style.display = 'none';
+        placeholder.style.display = 'block';
+    }
+}
+
 function setMedicineAction(action) {
     document.getElementById('medicineAction').value = action;
     document.getElementById('modalTitle').textContent = action === 'add' ? 'Add New Medicine' : 'Edit Medicine';
@@ -183,6 +243,8 @@ function setMedicineAction(action) {
         document.querySelectorAll('#medicineModal .form-input').forEach(input => input.value = '');
         document.getElementById('medicineStatus').value = 'available';
         document.getElementById('medicinePrescription').checked = false;
+        document.getElementById('medicineImagePreview').style.display = 'none';
+        document.getElementById('medicineImagePlaceholder').style.display = 'block';
     }
 }
 
@@ -198,6 +260,17 @@ function editMedicine(med) {
     document.getElementById('medicineDescription').value = med.description;
     document.getElementById('medicineStatus').value = med.status;
     document.getElementById('medicinePrescription').checked = med.prescription_required == 1;
+    
+    // Show medicine image if exists
+    if (med.image && med.image !== 'default-medicine.png') {
+        document.getElementById('medicineImagePreview').src = '../uploads/medicines/' + med.image;
+        document.getElementById('medicineImagePreview').style.display = 'block';
+        document.getElementById('medicineImagePlaceholder').style.display = 'none';
+    } else {
+        document.getElementById('medicineImagePreview').style.display = 'none';
+        document.getElementById('medicineImagePlaceholder').style.display = 'block';
+    }
+    
     openModal('medicineModal');
 }
 </script>

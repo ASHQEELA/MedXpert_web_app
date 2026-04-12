@@ -57,6 +57,7 @@ CREATE TABLE blood_donors (
     available BOOLEAN DEFAULT TRUE,
     emergency_contact VARCHAR(20),
     medical_conditions TEXT,
+    image VARCHAR(255) DEFAULT 'default-donor.png',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_blood_type (blood_type),
     INDEX idx_location (location),
