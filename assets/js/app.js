@@ -117,7 +117,7 @@ function initSearch() {
 }
 
 function searchDoctors(term) {
-    fetch(`api/get_doctors.php?search=${term}`)
+    fetch(`../api/get_doctors.php?search=${term}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -129,7 +129,7 @@ function searchDoctors(term) {
 
 function searchDonors(term) {
     const bloodType = document.querySelector('.filter-btn.active')?.dataset.filter || 'all';
-    fetch(`api/get_donors.php?search=${term}&blood_type=${bloodType}`)
+    fetch(`../api/get_donors.php?search=${term}&blood_type=${bloodType}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -141,7 +141,7 @@ function searchDonors(term) {
 
 function searchMedicines(term) {
     const category = document.querySelector('.filter-btn.active')?.dataset.filter || 'all';
-    fetch(`api/get_medicines.php?search=${term}&category=${category}`)
+    fetch(`../api/get_medicines.php?search=${term}&category=${category}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -180,7 +180,7 @@ function initFilters() {
 
 function filterDonors(bloodType) {
     const searchTerm = document.querySelector('[data-search="donors"]')?.value || '';
-    fetch(`api/get_donors.php?blood_type=${bloodType}&search=${searchTerm}`)
+    fetch(`../api/get_donors.php?blood_type=${bloodType}&search=${searchTerm}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -192,7 +192,7 @@ function filterDonors(bloodType) {
 
 function filterMedicines(category) {
     const searchTerm = document.querySelector('[data-search="medicines"]')?.value || '';
-    fetch(`api/get_medicines.php?category=${category}&search=${searchTerm}`)
+    fetch(`../api/get_medicines.php?category=${category}&search=${searchTerm}`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -470,7 +470,7 @@ function submitAmbulanceRequest() {
     // Set request_type to 'scheduled' for form submissions
     formData.set('request_type', 'scheduled');
     
-    fetch('api/request_ambulance.php', {
+    fetch('../api/request_ambulance.php', {
         method: 'POST',
         body: formData
     })
