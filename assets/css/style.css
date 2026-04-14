@@ -3,7 +3,7 @@
 /* CSS Variables for Theme */
 :root {
     /* Primary Colors - Modern Blue/Purple Gradient */
-    --primary: #6366f1;
+    --primary: #5153ee;
     --primary-dark: #4f46e5;
     --primary-light: #818cf8;
     --secondary: #8b5cf6;
@@ -199,7 +199,7 @@ a:hover {
 .form-label {
     display: block;
     margin-bottom: var(--spacing-xs);
-    color: var(--dark-lighter);
+    color: var(--white);
     font-weight: 600;
     font-size: 0.9rem;
 }
@@ -207,7 +207,7 @@ a:hover {
 .form-input {
     width: 100%;
     padding: 0.875rem var(--spacing);
-    border: 2px solid var(--gray-lighter);
+    border: 2px solid var(--white);
     border-radius: var(--radius);
     font-size: 1rem;
     transition: var(--transition);
