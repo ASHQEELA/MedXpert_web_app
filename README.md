@@ -105,7 +105,8 @@ Use a PHP host with MySQL, such as InfinityFree.
 - Do not commit real database credentials. Keep `config/db.php` out of public repositories.
 - Change the demo passwords.
 - Do not store real patient data on a free host.
-
+## View Live
+[Live](https://medxpert.infy.click/)
 ## Author
 
 Ashiq, Daffodil International University
